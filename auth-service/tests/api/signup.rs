@@ -4,18 +4,12 @@ use crate::helpers::{
     get_random_email,    
 };
 use auth_service::routes::SignupResponseBody;
+use auth_service::ErrorResponseBody;
 
 #[tokio::test]
 async fn should_return_201_if_valid_input() {
     let app = TestApp::new().await;
     let random_email = get_random_email();
-
-    // Expected:
-    //  {
-    //      "email": "DIIV26@WPmWVXNBvnTBYGNierIsY.dtu",
-    //      "password": "string",
-    //      "requires2FA": true
-    //  }
 
     let payload = json!({
         "email" : random_email,
@@ -44,16 +38,84 @@ async fn should_return_201_if_valid_input() {
 }
 
 #[tokio::test]
+async fn should_return_400_if_invalid_input() {
+    let app = TestApp::new().await;
+    let random_email = get_random_email();
+
+    let test_cases = [
+        json!(
+            {
+                "email" : "",
+                "password" : "password123",
+                "requires2FA" : true,
+            }
+        ),
+        json!(
+            {
+                "email" : "email_at_test.com",
+                "password" : "password123",
+                "requires2FA" : true,
+            }
+        ),
+        json!(
+            {
+                "email" : random_email,
+                "password" : "pass123",
+                "requires2FA" : true,
+            }
+        ),
+    ];
+
+    for test_case in test_cases.iter() {
+        let response = app.post_signup(&test_case).await;
+        assert_eq!(
+            response.status().as_u16(),
+            400
+        );
+        assert_eq!(
+            response
+                .json::<ErrorResponseBody>()
+                .await
+                .expect("Could not deserialize response body to ErrorResponse")
+                .error,
+            "Invalid credentials".to_owned()
+        );
+    }
+}
+
+#[tokio::test]
+async fn should_return_409_if_email_already_exists() {
+    let app = TestApp::new().await;
+    let random_email = get_random_email();
+
+    let payload = json!({
+        "email" : random_email,
+        "password" : "password123",
+        "requires2FA" : true,
+    });
+
+    let _ = app.post_signup(&payload).await;
+    let response = app.post_signup(&payload).await;
+
+    assert_eq!(
+        response.status().as_u16(),
+        409
+    );
+
+    assert_eq!(
+        response
+            .json::<ErrorResponseBody>()
+            .await
+            .expect("Could not deserialize response body to ErrorResponse")
+            .error,
+        "User already exists".to_owned()
+    );
+}
+
+#[tokio::test]
 async fn post_signup_malformed_payload_returns_422() {
     let app = TestApp::new().await;
     let random_email = get_random_email();
-    
-    // Expected:
-    //  {
-    //      "email": "DIIV26@WPmWVXNBvnTBYGNierIsY.dtu",
-    //      "password": "string",
-    //      "requires2FA": true
-    //  }
 
     let test_cases = [
         json!(

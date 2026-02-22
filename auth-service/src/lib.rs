@@ -5,13 +5,18 @@ pub mod app_state;
 
 use std::error::Error;
 use axum::{
+    response::{IntoResponse, Response},
     routing::{Router, post},
     serve::Serve,
+    http::StatusCode,
+    Json
 };
 use tokio::net::TcpListener;
 use tower_http::services::ServeDir;
 use routes::*;
 use app_state::AppState;
+use domain::AuthAPIError;
+use serde::{Serialize, Deserialize};
 
 // This struct encapsulates our application-related logic.
 pub struct Application {
@@ -53,5 +58,26 @@ impl Application {
     pub async fn run(self) -> Result<(), std::io::Error> {
         println!("listening on {}", &self.address);
         self.server.await
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ErrorResponseBody {
+    pub error: String
+}
+
+impl IntoResponse for AuthAPIError {
+    fn into_response(self) -> Response {
+        let (status, error_message) = match self {
+            AuthAPIError::UserAlreadyExists => (StatusCode::CONFLICT, "User already exists"),
+            AuthAPIError::InvalidCredentials => (StatusCode::BAD_REQUEST, "Invalid credentials"),
+            AuthAPIError::UnexpectedError => {
+                (StatusCode::INTERNAL_SERVER_ERROR, "Unexpected error")
+            }
+        };
+        let body = Json(ErrorResponseBody {
+            error: error_message.to_string(),
+        });
+        (status, body).into_response()
     }
 }
