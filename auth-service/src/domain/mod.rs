@@ -6,3 +6,9 @@ pub use error::AuthAPIError;
 
 mod data_stores;
 pub use data_stores::{UserStore, UserStoreError};
+
+mod email;
+pub use email::{Email, EmailValidationError};
+
+mod password;
+pub use password::{Password, PasswordValidationError};

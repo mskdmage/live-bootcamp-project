@@ -7,7 +7,7 @@ use axum::{
 
 use crate::{
     app_state::AppState,
-    domain::{AuthAPIError, User, UserStoreError},
+    domain::{AuthAPIError, User, UserStoreError, Email, Password},
 };
 
 pub async fn signup_handler(
@@ -15,11 +15,12 @@ pub async fn signup_handler(
     Json(body): Json<SignupRequestBody>,
 ) -> Result<impl IntoResponse, AuthAPIError> {
 
-    if !body.email.contains('@') || body.password.len() < 8 {
-        return Err(AuthAPIError::InvalidCredentials);
-    }
+    let email = Email::parse(&body.email)
+        .map_err(|_| AuthAPIError::InvalidCredentials)?;
+    let password = Password::parse(&body.password)
+        .map_err(|_| AuthAPIError::InvalidCredentials)?;
     
-    let new_user = User::new(&body.email, &body.password, body.requires_2fa);
+    let new_user = User::new(email, password, body.requires_2fa);
     let mut user_store = state.user_store.write().await;
 
     user_store.add_user(new_user).await.map_err(|e| match e {
