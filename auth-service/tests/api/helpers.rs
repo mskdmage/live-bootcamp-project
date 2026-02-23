@@ -1,7 +1,10 @@
+use std::sync::Arc;
+use tokio::sync::RwLock;
 use uuid::Uuid;
 use auth_service::{
     Application,
-    app_state::{ AppState, UserStoreType },
+    app_state::{ AppState },
+    services::HashmapUserStore,
 };
 
 pub struct TestApp {
@@ -12,7 +15,9 @@ pub struct TestApp {
 impl TestApp {
     pub async fn new() -> Self {
 
-        let user_store = UserStoreType::default();
+        let user_store = Arc::new(
+            RwLock::new(HashmapUserStore::default())
+        );
         let app_state = AppState { user_store };
 
         let app = Application::build(app_state,"127.0.0.1:0")

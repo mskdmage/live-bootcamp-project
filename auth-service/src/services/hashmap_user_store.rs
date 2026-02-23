@@ -1,23 +1,16 @@
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 
-use crate::domain::User;
-
-#[derive(Debug, PartialEq)]
-pub enum UserStoreError {
-    UserAlreadyExists,
-    UserNotFound,
-    InvalidCredentials,
-    UnexpectedError,
-}
+use crate::domain::{User, UserStore, UserStoreError};
 
 #[derive(Default)]
 pub struct HashmapUserStore {
     users: HashMap<String, User>,
 }
 
-impl HashmapUserStore {
-    pub fn add_user(&mut self, user: User) -> Result<(), UserStoreError> {
+#[async_trait::async_trait]
+impl UserStore for HashmapUserStore {
+    async fn add_user(&mut self, user: User) -> Result<(), UserStoreError> {
 
         match self.users.entry(user.email.clone()) {
             Entry::Occupied(_) => Err(UserStoreError::UserAlreadyExists),
@@ -26,10 +19,10 @@ impl HashmapUserStore {
                 Ok(())
             },
         }
-
+        
     }
 
-    pub fn get_user(&self, email: &str) -> Result<User, UserStoreError> {
+    async fn get_user(&self, email: &str) -> Result<User, UserStoreError> {
 
         self.users
             .get(email)
@@ -38,7 +31,7 @@ impl HashmapUserStore {
 
     }
 
-    pub fn validate_user(&self, email: &str, password: &str) -> Result<(), UserStoreError> {
+    async fn validate_user(&self, email: &str, password: &str) -> Result<(), UserStoreError> {
 
         let user = self.users
             .get(email)
@@ -63,9 +56,9 @@ mod tests {
         let new_user = User::new("test@test.com", "password123", true);
         let same_user = new_user.clone();
 
-        assert_eq!(store.add_user(new_user.clone()), Ok(()));
+        assert_eq!(store.add_user(new_user.clone()).await, Ok(()));
         assert_eq!(
-            store.add_user(same_user),
+            store.add_user(same_user).await,
             Err(UserStoreError::UserAlreadyExists)
         );
 
@@ -78,13 +71,13 @@ mod tests {
         let new_user = User::new("test@test.com", "password123", true);
         let email = new_user.email.clone();
 
-        store.add_user(new_user.clone()).unwrap();
+        store.add_user(new_user.clone()).await.unwrap();
 
-        let fetched = store.get_user(&email);
+        let fetched = store.get_user(&email).await;
         assert_eq!(fetched, Ok(new_user));
 
         assert_eq!(
-            store.get_user("notfound@test.com"),
+            store.get_user("notfound@test.com").await,
             Err(UserStoreError::UserNotFound)
         );
 
@@ -96,20 +89,20 @@ mod tests {
         let mut store = HashmapUserStore::default();
         let new_user = User::new("test@test.com", "password123", true);
 
-        store.add_user(new_user).unwrap();
+        store.add_user(new_user).await.unwrap();
 
         assert_eq!(
-            store.validate_user("wrong@test.com", "password123"),
+            store.validate_user("wrong@test.com", "password123").await,
             Err(UserStoreError::UserNotFound)
         );
 
         assert_eq!(
-            store.validate_user("test@test.com", "wrongpassword"),
+            store.validate_user("test@test.com", "wrongpassword").await,
             Err(UserStoreError::InvalidCredentials)
         );
 
         assert_eq!(
-            store.validate_user("test@test.com", "password123"),
+            store.validate_user("test@test.com", "password123").await,
             Ok(())
         );
 

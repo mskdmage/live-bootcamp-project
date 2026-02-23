@@ -1,6 +1,6 @@
 pub mod routes;
-mod domain;
-mod services;
+pub mod domain;
+pub mod services;
 pub mod app_state;
 
 use std::error::Error;
