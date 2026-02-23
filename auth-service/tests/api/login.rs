@@ -1,8 +1,99 @@
-use crate::helpers::TestApp;
+use serde_json::json;
+
+use crate::helpers::{TestApp,  get_random_email};
 
 #[tokio::test]
-async fn post_login_returns_ok() {
+async fn should_return_400_if_invalid_input() {
     let app = TestApp::new().await;
-    let response = app.post_login().await;
-    assert_eq!(response.status().as_u16(), 200);
+    let random_email = get_random_email();
+
+    let test_cases = [
+        json!({
+            "email" : random_email,
+            "password" : "p12",
+        }),
+        json!({
+            "email" : "test@",
+            "password" : "password123",
+        }),
+    ];
+
+    for test_case in test_cases.iter() {
+        let response = app.post_login(test_case).await;
+        assert_eq!(
+            response.status().as_u16(),
+            400,
+            "Failed for input: {:?}",
+            test_case
+        );
+    }
+}
+
+#[tokio::test]
+async fn should_return_401_if_incorrect_credentials() {
+    let app = TestApp::new().await;
+    let random_email = get_random_email();
+
+    let new_user_payload = json!(
+        {
+            "email" : random_email,
+            "password" : "password123",
+            "requires2FA" : true,
+        }
+    );
+
+    app.post_signup(&new_user_payload).await;
+
+    let login_payload = json!(
+        {
+            "email" : random_email,
+            "password" : "assword123",
+        }
+    );
+
+    let response = app.post_login(&login_payload).await;
+
+    assert_eq!(
+        response.status().as_u16(),
+        401,
+        "Failed for input: {:?}",
+        login_payload
+    );
+
+}
+
+#[tokio::test]
+async fn post_login_malformed_payload_returns_422() {
+    let app = TestApp::new().await;
+    let random_email = get_random_email();
+
+    let test_cases = [
+        json!(
+            {
+                "email" : random_email,
+                "passwd" : "password123",
+            }
+        ),
+        json!(
+            {
+                "email" : random_email
+            }
+        ),
+        json!(
+            {
+                "password" : "password123"
+            }
+        ),
+    ];
+
+    for test_case in test_cases.iter() {
+        let response = app.post_login(test_case).await;
+        assert_eq!(
+            response.status().as_u16(),
+            422,
+            "Failed for input: {:?}",
+            test_case
+        );
+    }
+
 }
