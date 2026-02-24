@@ -3,7 +3,8 @@ use chrono::Utc;
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Validation};
 use serde::{Deserialize, Serialize};
 
-use crate::domain::Email;
+use crate::domain::{Email, Token};
+use crate::app_state::BannedTokenStoreType;
 
 use super::constants::{JWT_COOKIE_NAME, JWT_SECRET};
 
@@ -57,9 +58,14 @@ fn generate_auth_token(email: &Email) -> Result<String, GenerateTokenError> {
 }
 
 // Check if JWT auth token is valid by decoding it using the JWT secret
-pub async fn validate_token(token: &str) -> Result<Claims, jsonwebtoken::errors::Error> {
+pub async fn validate_token(token: &Token, banned_token_store: &BannedTokenStoreType) -> Result<Claims, jsonwebtoken::errors::Error> {
+    let banned_token_store = banned_token_store.read().await;
+    if banned_token_store.is_token_banned(token).await.unwrap_or(false) {
+        return Err(jsonwebtoken::errors::ErrorKind::InvalidToken.into());
+    }
+
     decode::<Claims>(
-        token,
+        token.as_ref(),
         &DecodingKey::from_secret(JWT_SECRET.as_bytes()),
         &Validation::default(),
     )
@@ -84,9 +90,20 @@ pub struct Claims {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Arc;
+    use std::env;
+    use tokio::sync::RwLock;
+    use crate::services::HashSetBannedTokenStore;
+    use crate::app_state::BannedTokenStoreType;
+
+    // Helper to set JWT_SECRET for tests
+    fn setup_test_env() {
+        env::set_var("JWT_SECRET", "test_secret_key_for_testing_purposes_only");
+    }
 
     #[tokio::test]
     async fn test_generate_auth_cookie() {
+        setup_test_env();
         let email = Email::parse("test@example.com").unwrap();
         let cookie = generate_auth_cookie(&email).unwrap();
         assert_eq!(cookie.name(), JWT_COOKIE_NAME);
@@ -98,6 +115,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_auth_cookie() {
+        setup_test_env();
         let token = "test_token".to_owned();
         let cookie = create_auth_cookie(token.clone());
         assert_eq!(cookie.name(), JWT_COOKIE_NAME);
@@ -109,6 +127,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_generate_auth_token() {
+        setup_test_env();
         let email = Email::parse("test@example.com").unwrap();
         let result = generate_auth_token(&email).unwrap();
         assert_eq!(result.split('.').count(), 3);
@@ -116,9 +135,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_validate_token_with_valid_token() {
+        setup_test_env();
+        let banned_token_store: BannedTokenStoreType = Arc::new(RwLock::new(HashSetBannedTokenStore::default()));
         let email = Email::parse("test@example.com").unwrap();
-        let token = generate_auth_token(&email).unwrap();
-        let result = validate_token(&token).await.unwrap();
+        let token = Token::parse(&generate_auth_token(&email).unwrap()).unwrap();
+        let result = validate_token(&token, &banned_token_store).await.unwrap();
         assert_eq!(result.sub, "test@example.com");
 
         let exp = Utc::now()
@@ -131,8 +152,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_validate_token_with_invalid_token() {
-        let token = "invalid_token".to_owned();
-        let result = validate_token(&token).await;
+        setup_test_env();
+        let banned_token_store: BannedTokenStoreType = Arc::new(RwLock::new(HashSetBannedTokenStore::default()));
+        let invalid_jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.invalid.signature";
+        let token = Token::parse(invalid_jwt).unwrap();
+        let result = validate_token(&token, &banned_token_store).await;
         assert!(result.is_err());
     }
 }

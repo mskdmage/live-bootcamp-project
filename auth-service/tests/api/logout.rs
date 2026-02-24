@@ -1,4 +1,4 @@
-use auth_service::{utils::constants::JWT_COOKIE_NAME};
+use auth_service::{utils::constants::JWT_COOKIE_NAME, domain::Token};
 use reqwest::Url;
 use serde_json::json;
 
@@ -31,9 +31,32 @@ async fn should_return_200_if_valid_jwt_cookie() {
     let login_response = app.post_login(&login_payload).await;
     assert_eq!(login_response.status().as_u16(), 200);
 
+    let auth_cookie = login_response
+        .cookies()
+        .find(|cookie| cookie.name() == JWT_COOKIE_NAME)
+        .expect("No auth cookie found");
+    
+    let token_value = auth_cookie.value();
+    let token = Token::parse(token_value)
+        .expect("Failed to parse token");
+
+    let banned_token_store = app.banned_token_store.read().await;
+    assert_eq!(
+        banned_token_store.is_token_banned(&token).await,
+        Ok(false),
+        "Token should not be banned before logout"
+    );
+    drop(banned_token_store);
+
     let logout_response = app.post_logout().await;
     assert_eq!(logout_response.status().as_u16(), 200);
 
+    let banned_token_store = app.banned_token_store.read().await;
+    assert_eq!(
+        banned_token_store.is_token_banned(&token).await,
+        Ok(true),
+        "Token should be banned after logout"
+    );
 }
 
 #[tokio::test]

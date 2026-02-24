@@ -3,8 +3,8 @@ use tokio::sync::RwLock;
 use uuid::Uuid;
 use auth_service::{
     Application,
-    app_state::{ AppState },
-    services::HashmapUserStore,
+    app_state::{ AppState, BannedTokenStoreType },
+    services::{HashmapUserStore, HashSetBannedTokenStore},
 };
 use auth_service::utils::constants::test;
 use reqwest::cookie::Jar;
@@ -13,6 +13,7 @@ pub struct TestApp {
     pub address: String,
     pub cookie_jar: Arc<Jar>,
     pub http_client: reqwest::Client,
+    pub banned_token_store: BannedTokenStoreType,
 }
 
 impl TestApp {
@@ -21,7 +22,12 @@ impl TestApp {
         let user_store = Arc::new(
             RwLock::new(HashmapUserStore::default())
         );
-        let app_state = AppState { user_store };
+
+        let banned_token_store = Arc::new(
+            RwLock::new(HashSetBannedTokenStore::default())
+        );
+        
+        let app_state = AppState::new(user_store, banned_token_store.clone());
 
         let app = Application::build(app_state, test::APP_ADDRESS)
             .await
@@ -43,7 +49,8 @@ impl TestApp {
         Self {
             address,
             cookie_jar,
-            http_client
+            http_client,
+            banned_token_store,
         }
     }
 

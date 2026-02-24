@@ -2,24 +2,26 @@ use serde::Deserialize;
 use axum::{
     response::IntoResponse,
     http::StatusCode,
-    extract::Json,
+    extract::{Json, State},
 };
 use crate::domain::{AuthAPIError, Token};
 use crate::utils::auth::validate_token;
+use crate::AppState;
 
 pub async fn verify_token_handler(
+    State(state): State<AppState>,
     Json(body): Json<VerifyTokenRequestBody>,
 ) -> Result<impl IntoResponse, AuthAPIError> {
-    
+
     let token = match Token::parse(&body.token) {
         Ok(token) => token,
         Err(_) => return Err(AuthAPIError::InvalidToken),
     };
 
-    // match validate_token(&token.as_ref()).await {
-    //     Ok(_) => (),
-    //     Err(_) => return Err(AuthAPIError::InvalidToken),
-    // }
+    match validate_token(&token, &state.banned_token_store).await {
+        Ok(_) => (),
+        Err(_) => return Err(AuthAPIError::InvalidToken),
+    }
         
     Ok(StatusCode::OK.into_response())
 }

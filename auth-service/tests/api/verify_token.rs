@@ -1,7 +1,7 @@
 use serde_json::json;
 use crate::helpers::{get_random_email, TestApp};
 
-use auth_service::{utils::constants::JWT_COOKIE_NAME, ErrorResponseBody};
+use auth_service::{utils::constants::JWT_COOKIE_NAME};
 
 #[tokio::test]
 async fn should_return_200_valid_token() {
@@ -50,12 +50,53 @@ async fn should_return_200_valid_token() {
 #[tokio::test]
 async fn should_return_401_if_invalid_token() {
     let app = TestApp::new().await;
+    let random_email = get_random_email();
 
     let verify_token_payload = json!(
         {
             "token": "invalid_token",
         }
     );
+
+    let verify_token_response = app.post_verify_token(&verify_token_payload).await;
+    assert_eq!(verify_token_response.status().as_u16(), 401);
+
+    let signup_payload = json!(
+        {
+            "email": random_email,
+            "password": "password123",
+            "requires2FA": false
+        }
+    );
+
+    let _signup_response = app.post_signup(&signup_payload).await;
+
+    let login_payload = json!(
+        {
+            "email": random_email,
+            "password": "password123",
+        }
+    );
+
+    let login_response = app.post_login(&login_payload).await;
+    assert_eq!(login_response.status().as_u16(), 200);
+
+    let auth_cookie = login_response
+        .cookies()
+        .find(|cookie| cookie.name() == JWT_COOKIE_NAME)
+        .expect("No auth cookie found");
+
+    let verify_token_payload = json!(
+        {
+            "token": auth_cookie.value(),
+        }
+    );
+
+    let verify_token_response = app.post_verify_token(&verify_token_payload).await;
+    assert_eq!(verify_token_response.status().as_u16(), 200);
+
+    let logout_response = app.post_logout().await;
+    assert_eq!(logout_response.status().as_u16(), 200);
 
     let verify_token_response = app.post_verify_token(&verify_token_payload).await;
     assert_eq!(verify_token_response.status().as_u16(), 401);
