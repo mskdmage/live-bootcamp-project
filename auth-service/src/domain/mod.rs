@@ -12,3 +12,6 @@ pub use email::{Email, EmailValidationError};
 
 mod password;
 pub use password::{Password, PasswordValidationError};
+
+mod token;
+pub use token::{Token, TokenValidationError};
