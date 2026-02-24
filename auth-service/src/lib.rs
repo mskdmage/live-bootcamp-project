@@ -9,15 +9,16 @@ use axum::{
     response::{IntoResponse, Response},
     routing::{Router, post},
     serve::Serve,
-    http::StatusCode,
+    http::{StatusCode, Method},
     Json
 };
 use tokio::net::TcpListener;
-use tower_http::services::ServeDir;
+use tower_http::{cors::CorsLayer, services::ServeDir};
 use routes::*;
 use app_state::AppState;
 use domain::AuthAPIError;
 use serde::{Serialize, Deserialize};
+
 
 // This struct encapsulates our application-related logic.
 pub struct Application {
@@ -29,6 +30,20 @@ pub struct Application {
 
 impl Application {
     pub async fn build(app_state: AppState, address: &str) -> Result<Self, Box<dyn Error>> {
+        
+        let allowed_origins = [
+            "http://localhost:8000".parse()?,
+            // TODO: Replace [YOUR_DROPLET_IP] with your Droplet IP address
+            "http://24.199.83.112:8000".parse()?,
+        ];
+
+        let cors = CorsLayer::new()
+            // Allow GET and POST requests
+            .allow_methods([Method::GET, Method::POST])
+            // Allow cookies to be included in requests
+            .allow_credentials(true)
+            .allow_origin(allowed_origins);
+
         // Move the Router definition from `main.rs` to here.
         // Also, remove the `hello` route.
         // We don't need it at this point!
@@ -41,7 +56,8 @@ impl Application {
             .route("/logout", post(logout_handler))
             .route("/verify-2fa", post(verify_2fa_handler))
             .route("/verify-token", post(verify_token_handler))
-            .with_state(app_state);
+            .with_state(app_state)
+            .layer(cors);
 
         let listener = tokio::net::TcpListener::bind(address).await?;
         let address = listener.local_addr()?.to_string();
@@ -73,6 +89,8 @@ impl IntoResponse for AuthAPIError {
             AuthAPIError::UserAlreadyExists => (StatusCode::CONFLICT, "User already exists"),
             AuthAPIError::IncorrectCredentials => (StatusCode::UNAUTHORIZED, "Authentication Failed"),
             AuthAPIError::InvalidCredentials => (StatusCode::BAD_REQUEST, "Invalid credentials"),
+            AuthAPIError::MissingToken => (StatusCode::BAD_REQUEST, "Missing token"),
+            AuthAPIError::InvalidToken => (StatusCode::UNAUTHORIZED, "Invalid token"),
             AuthAPIError::UnexpectedError => {
                 (StatusCode::INTERNAL_SERVER_ERROR, "Unexpected error")
             }
