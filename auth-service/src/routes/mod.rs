@@ -1,5 +1,5 @@
 mod login;
-pub use login::login_handler;
+pub use login::{login_handler, TwoFactorAuthResponseBody};
 
 mod logout;
 pub use logout::logout_handler;

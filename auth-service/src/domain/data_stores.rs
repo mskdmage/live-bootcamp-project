@@ -1,4 +1,4 @@
-use crate::domain::{User, Email, Password, Token};
+use crate::domain::{User, Email, Password, Token, LoginAttemptId, TwoFACode};
 
 #[async_trait::async_trait]
 pub trait UserStore: Send + Sync {
@@ -13,6 +13,13 @@ pub trait BannedTokenStore: Send + Sync {
     async fn is_token_banned(&self, token: &Token) -> Result<bool, BannedTokenStoreError>;
 }
 
+#[async_trait::async_trait]
+pub trait TwoFACodeStore: Send + Sync {
+    async fn add_code(&mut self, email: Email, login_attempt_id: LoginAttemptId, code: TwoFACode) -> Result<(), TwoFACodeStoreError>;
+    async fn remove_code(&mut self, email: &Email) -> Result<(), TwoFACodeStoreError>;
+    async fn get_code(&self, email: &Email) -> Result<(LoginAttemptId, TwoFACode), TwoFACodeStoreError>;
+}
+
 #[derive(Debug, PartialEq)]
 pub enum UserStoreError {
     UserAlreadyExists,
@@ -25,5 +32,11 @@ pub enum UserStoreError {
 pub enum BannedTokenStoreError {
     TokenAlreadyBanned,
     TokenNotFound,
+    UnexpectedError,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum TwoFACodeStoreError {
+    LoginAttemptIdNotFound,
     UnexpectedError,
 }
