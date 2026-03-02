@@ -24,3 +24,6 @@ pub use login_attempt_id::LoginAttemptId;
 
 mod two_fa_code;
 pub use two_fa_code::TwoFACode;
+
+mod email_client;
+pub use email_client::EmailClient;

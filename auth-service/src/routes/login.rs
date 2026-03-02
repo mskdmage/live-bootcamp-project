@@ -59,27 +59,41 @@ async fn handle_2fa_enabled(
     let login_attempt_id = LoginAttemptId::default();
     let two_fa_code = TwoFACode::default();
 
-    let mut two_fa_code_store = state.two_fa_code_store.write().await;
+    {
+        let mut two_fa_code_store = state.two_fa_code_store.write().await;
 
-    match two_fa_code_store
-        .add_code(email.clone(), login_attempt_id.clone(), two_fa_code.clone())
-        .await
-        .map_err(|e| match e {
-            TwoFACodeStoreError::UnexpectedError => AuthAPIError::UnexpectedError,
-            _ => AuthAPIError::InvalidCredentials,
-        }) {
-        Ok(_) => (
-            jar,
-            Ok((
-                StatusCode::PARTIAL_CONTENT,
-                Json(LoginResponseBody::TwoFactor(TwoFactorAuthResponseBody {
-                    message: "2FA required".to_owned(),
-                    login_attempt_id: login_attempt_id.as_ref().to_owned(),
-                })),
-            )),
-        ),
-        Err(_) => (jar, Err(AuthAPIError::UnexpectedError)),
+        if let Err(e) = two_fa_code_store
+            .add_code(email.clone(), login_attempt_id.clone(), two_fa_code.clone())
+            .await
+        {
+            let api_err = match e {
+                TwoFACodeStoreError::UnexpectedError => AuthAPIError::UnexpectedError,
+                _ => AuthAPIError::InvalidCredentials,
+            };
+            return (jar, Err(api_err));
+        }
     }
+
+    {
+        let email_client = state.email_client.write().await;
+
+        if let Err(_) = email_client
+            .send_email(email, "2FA code", two_fa_code.as_ref())
+            .await
+        {
+            return (jar, Err(AuthAPIError::UnexpectedError));
+        }
+    }
+
+    let body = LoginResponseBody::TwoFactor(TwoFactorAuthResponseBody {
+        message: "2FA required".to_owned(),
+        login_attempt_id: login_attempt_id.as_ref().to_owned(),
+    });
+
+    (
+        jar,
+        Ok((StatusCode::PARTIAL_CONTENT, Json(body))),
+    )
 }
 
 async fn handle_2fa_disabled(
