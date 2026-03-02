@@ -1,10 +1,10 @@
 use auth_service::domain::Email;
 use serde_json::json;
 
-use crate::helpers::{TestApp,  get_random_email};
-use auth_service::utils::constants::JWT_COOKIE_NAME;
-use auth_service::routes::TwoFactorAuthResponseBody;
+use crate::helpers::{get_random_email, TestApp};
 use auth_service::domain::LoginAttemptId;
+use auth_service::routes::TwoFactorAuthResponseBody;
+use auth_service::utils::constants::JWT_COOKIE_NAME;
 
 #[tokio::test]
 async fn should_return_200_if_valid_credentials_and_2fa_disabled() {
@@ -63,28 +63,26 @@ async fn should_return_206_if_valid_credentials_and_2fa_enabled() {
     let response = app.post_login(&login_body).await;
     assert_eq!(response.status().as_u16(), 206);
 
-    let response_body =         response
-            .json::<TwoFactorAuthResponseBody>()
-            .await
-            .expect("Could not deserialize response body to TwoFactorAuthResponse");
+    let response_body = response
+        .json::<TwoFactorAuthResponseBody>()
+        .await
+        .expect("Could not deserialize response body to TwoFactorAuthResponse");
 
-    assert_eq!(
-        response_body.clone().message,
-        "2FA required".to_owned()
-    );
+    assert_eq!(response_body.clone().message, "2FA required".to_owned());
 
     let store = app.two_fa_code_store.read().await;
 
-    let (login_attempt_id, two_fa_code) = store.get_code(&Email::parse(&random_email).unwrap()).await.unwrap();
+    let (login_attempt_id, _) = store
+        .get_code(&Email::parse(&random_email).unwrap())
+        .await
+        .unwrap();
 
     let response_login_attempt_id = response_body.clone().login_attempt_id;
 
-    assert_eq!(login_attempt_id, LoginAttemptId::parse(response_login_attempt_id).unwrap());
-
-    // TODO: assert that `json_body.login_attempt_id` is stored inside `app.two_fa_code_store`
-
-
-
+    assert_eq!(
+        login_attempt_id,
+        LoginAttemptId::parse(response_login_attempt_id).unwrap()
+    );
 }
 
 #[tokio::test]
@@ -144,7 +142,6 @@ async fn should_return_401_if_incorrect_credentials() {
         "Failed for input: {:?}",
         login_payload
     );
-
 }
 
 #[tokio::test]
@@ -180,5 +177,4 @@ async fn post_login_malformed_payload_returns_422() {
             test_case
         );
     }
-
 }

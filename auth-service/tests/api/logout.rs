@@ -1,4 +1,4 @@
-use auth_service::{utils::constants::JWT_COOKIE_NAME, domain::Token};
+use auth_service::{domain::Token, utils::constants::JWT_COOKIE_NAME};
 use reqwest::Url;
 use serde_json::json;
 
@@ -35,10 +35,9 @@ async fn should_return_200_if_valid_jwt_cookie() {
         .cookies()
         .find(|cookie| cookie.name() == JWT_COOKIE_NAME)
         .expect("No auth cookie found");
-    
+
     let token_value = auth_cookie.value();
-    let token = Token::parse(token_value)
-        .expect("Failed to parse token");
+    let token = Token::parse(token_value).expect("Failed to parse token");
 
     let banned_token_store = app.banned_token_store.read().await;
     assert_eq!(

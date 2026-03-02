@@ -1,7 +1,7 @@
-use serde_json::json;
 use crate::helpers::{get_random_email, TestApp};
+use serde_json::json;
 
-use auth_service::{utils::constants::JWT_COOKIE_NAME};
+use auth_service::utils::constants::JWT_COOKIE_NAME;
 
 #[tokio::test]
 async fn should_return_200_valid_token() {
@@ -29,7 +29,7 @@ async fn should_return_200_valid_token() {
 
     let login_response = app.post_login(&login_payload).await;
     assert_eq!(login_response.status().as_u16(), 200);
-    
+
     let auth_cookie = login_response
         .cookies()
         .find(|cookie| cookie.name() == JWT_COOKIE_NAME)

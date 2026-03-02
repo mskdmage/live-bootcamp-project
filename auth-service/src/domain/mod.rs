@@ -5,7 +5,10 @@ mod error;
 pub use error::AuthAPIError;
 
 mod data_stores;
-pub use data_stores::{UserStore, UserStoreError, BannedTokenStore, BannedTokenStoreError, TwoFACodeStore, TwoFACodeStoreError};
+pub use data_stores::{
+    BannedTokenStore, BannedTokenStoreError, TwoFACodeStore, TwoFACodeStoreError, UserStore,
+    UserStoreError,
+};
 
 mod email;
 pub use email::{Email, EmailValidationError};

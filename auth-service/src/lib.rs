@@ -1,24 +1,23 @@
-pub mod routes;
-pub mod domain;
-pub mod services;
 pub mod app_state;
+pub mod domain;
+pub mod routes;
+pub mod services;
 pub mod utils;
 
-use std::error::Error;
+use app_state::AppState;
 use axum::{
+    http::{Method, StatusCode},
     response::{IntoResponse, Response},
-    routing::{Router, post},
+    routing::{post, Router},
     serve::Serve,
-    http::{StatusCode, Method},
-    Json
+    Json,
 };
+use domain::AuthAPIError;
+use routes::*;
+use serde::{Deserialize, Serialize};
+use std::error::Error;
 use tokio::net::TcpListener;
 use tower_http::{cors::CorsLayer, services::ServeDir};
-use routes::*;
-use app_state::AppState;
-use domain::AuthAPIError;
-use serde::{Serialize, Deserialize};
-
 
 // This struct encapsulates our application-related logic.
 pub struct Application {
@@ -30,7 +29,6 @@ pub struct Application {
 
 impl Application {
     pub async fn build(app_state: AppState, address: &str) -> Result<Self, Box<dyn Error>> {
-        
         let allowed_origins = [
             "http://localhost:8000".parse()?,
             // TODO: Replace [YOUR_DROPLET_IP] with your Droplet IP address
@@ -48,7 +46,7 @@ impl Application {
         // Also, remove the `hello` route.
         // We don't need it at this point!
         let assets_dir = ServeDir::new("assets");
-        
+
         let router = Router::new()
             .fallback_service(assets_dir)
             .route("/signup", post(signup_handler))
@@ -64,12 +62,7 @@ impl Application {
         let server = axum::serve(listener, router);
 
         // Create a new Application instance and return it
-        Ok(
-            Self {
-                server,
-                address
-            }
-        )
+        Ok(Self { server, address })
     }
 
     pub async fn run(self) -> Result<(), std::io::Error> {
@@ -80,14 +73,16 @@ impl Application {
 
 #[derive(Serialize, Deserialize)]
 pub struct ErrorResponseBody {
-    pub error: String
+    pub error: String,
 }
 
 impl IntoResponse for AuthAPIError {
     fn into_response(self) -> Response {
         let (status, error_message) = match self {
             AuthAPIError::UserAlreadyExists => (StatusCode::CONFLICT, "User already exists"),
-            AuthAPIError::IncorrectCredentials => (StatusCode::UNAUTHORIZED, "Authentication Failed"),
+            AuthAPIError::IncorrectCredentials => {
+                (StatusCode::UNAUTHORIZED, "Authentication Failed")
+            }
             AuthAPIError::InvalidCredentials => (StatusCode::BAD_REQUEST, "Invalid credentials"),
             AuthAPIError::MissingToken => (StatusCode::BAD_REQUEST, "Missing token"),
             AuthAPIError::InvalidToken => (StatusCode::UNAUTHORIZED, "Invalid token"),

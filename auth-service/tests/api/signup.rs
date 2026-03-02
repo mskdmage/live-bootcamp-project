@@ -1,10 +1,7 @@
-use serde_json::json;
-use crate::helpers::{
-    TestApp,
-    get_random_email,    
-};
+use crate::helpers::{get_random_email, TestApp};
 use auth_service::routes::SignupResponseBody;
 use auth_service::ErrorResponseBody;
+use serde_json::json;
 
 #[tokio::test]
 async fn should_return_201_if_valid_input() {
@@ -19,10 +16,7 @@ async fn should_return_201_if_valid_input() {
 
     let response = app.post_signup(&payload).await;
 
-    assert_eq!(
-        response.status().as_u16(),
-        201
-    );
+    assert_eq!(response.status().as_u16(), 201);
 
     let expected_response = SignupResponseBody {
         message: "User created successfully!".to_owned(),
@@ -68,10 +62,7 @@ async fn should_return_400_if_invalid_input() {
 
     for test_case in test_cases.iter() {
         let response = app.post_signup(&test_case).await;
-        assert_eq!(
-            response.status().as_u16(),
-            400
-        );
+        assert_eq!(response.status().as_u16(), 400);
         assert_eq!(
             response
                 .json::<ErrorResponseBody>()
@@ -97,10 +88,7 @@ async fn should_return_409_if_email_already_exists() {
     let _ = app.post_signup(&payload).await;
     let response = app.post_signup(&payload).await;
 
-    assert_eq!(
-        response.status().as_u16(),
-        409
-    );
+    assert_eq!(response.status().as_u16(), 409);
 
     assert_eq!(
         response
@@ -133,7 +121,7 @@ async fn post_signup_malformed_payload_returns_422() {
         json!(
             {
                 "email" : random_email,
-                "requires2FA" : true, 
+                "requires2FA" : true,
             }
         ),
     ];
@@ -147,5 +135,4 @@ async fn post_signup_malformed_payload_returns_422() {
             test_case
         );
     }
-
 }

@@ -3,18 +3,19 @@ use chrono::Utc;
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Validation};
 use serde::{Deserialize, Serialize};
 
-use crate::domain::{Email, Token};
-use crate::app_state::BannedTokenStoreType;
+use crate::{
+    app_state::BannedTokenStoreType,
+    domain::{Email, Token},
+};
 
 use super::constants::{JWT_COOKIE_NAME, JWT_SECRET};
 
-// Create cookie with a new JWT auth token
 pub fn generate_auth_cookie(email: &Email) -> Result<Cookie<'static>, GenerateTokenError> {
     let token = generate_auth_token(email)?;
     Ok(create_auth_cookie(token))
 }
 
-// Create cookie and set the value to the passed-in token string 
+// Create cookie and set the value to the passed-in token string
 fn create_auth_cookie(token: String) -> Cookie<'static> {
     let cookie = Cookie::build((JWT_COOKIE_NAME, token))
         .path("/") // apply cookie to all URLs on the server
@@ -58,9 +59,16 @@ fn generate_auth_token(email: &Email) -> Result<String, GenerateTokenError> {
 }
 
 // Check if JWT auth token is valid by decoding it using the JWT secret
-pub async fn validate_token(token: &Token, banned_token_store: &BannedTokenStoreType) -> Result<Claims, jsonwebtoken::errors::Error> {
+pub async fn validate_token(
+    token: &Token,
+    banned_token_store: &BannedTokenStoreType,
+) -> Result<Claims, jsonwebtoken::errors::Error> {
     let banned_token_store = banned_token_store.read().await;
-    if banned_token_store.is_token_banned(token).await.unwrap_or(false) {
+    if banned_token_store
+        .is_token_banned(token)
+        .await
+        .unwrap_or(false)
+    {
         return Err(jsonwebtoken::errors::ErrorKind::InvalidToken.into());
     }
 
@@ -90,11 +98,11 @@ pub struct Claims {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::Arc;
-    use std::env;
-    use tokio::sync::RwLock;
-    use crate::services::HashSetBannedTokenStore;
     use crate::app_state::BannedTokenStoreType;
+    use crate::services::HashSetBannedTokenStore;
+    use std::env;
+    use std::sync::Arc;
+    use tokio::sync::RwLock;
 
     // Helper to set JWT_SECRET for tests
     fn setup_test_env() {
@@ -136,7 +144,8 @@ mod tests {
     #[tokio::test]
     async fn test_validate_token_with_valid_token() {
         setup_test_env();
-        let banned_token_store: BannedTokenStoreType = Arc::new(RwLock::new(HashSetBannedTokenStore::default()));
+        let banned_token_store: BannedTokenStoreType =
+            Arc::new(RwLock::new(HashSetBannedTokenStore::default()));
         let email = Email::parse("test@example.com").unwrap();
         let token = Token::parse(&generate_auth_token(&email).unwrap()).unwrap();
         let result = validate_token(&token, &banned_token_store).await.unwrap();
@@ -153,7 +162,8 @@ mod tests {
     #[tokio::test]
     async fn test_validate_token_with_invalid_token() {
         setup_test_env();
-        let banned_token_store: BannedTokenStoreType = Arc::new(RwLock::new(HashSetBannedTokenStore::default()));
+        let banned_token_store: BannedTokenStoreType =
+            Arc::new(RwLock::new(HashSetBannedTokenStore::default()));
         let invalid_jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.invalid.signature";
         let token = Token::parse(invalid_jwt).unwrap();
         let result = validate_token(&token, &banned_token_store).await;
