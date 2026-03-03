@@ -1,7 +1,6 @@
 use axum::{
     extract::{Json, State},
     http::StatusCode,
-    response::IntoResponse,
 };
 use axum_extra::extract::CookieJar;
 use serde::{Deserialize, Serialize};
@@ -18,7 +17,8 @@ pub async fn login_handler(
     State(state): State<AppState>,
     jar: CookieJar,
     Json(body): Json<LoginRequestBody>,
-) -> (CookieJar, Result<impl IntoResponse, AuthAPIError>) {
+) -> (CookieJar, Result<(StatusCode, Json<LoginResponseBody>), AuthAPIError>) {
+    
     let email = match Email::parse(&body.email) {
         Ok(email) => email,
         Err(_) => return (jar, Err(AuthAPIError::InvalidCredentials)),
@@ -134,5 +134,6 @@ pub enum LoginResponseBody {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TwoFactorAuthResponseBody {
     pub message: String,
+    #[serde(rename = "loginAttemptId")]
     pub login_attempt_id: String,
 }
